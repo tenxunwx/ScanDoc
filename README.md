@@ -87,7 +87,7 @@ base64 -i profile.mobileprovision -o profile.b64
 
 Windows 上可以用 `certutil -encode 文件名 输出名`，然后手动删掉首尾的 `-----BEGIN/END-----` 行。
 
-然后把 `mode` 选成 `development`（装自己或团队已注册设备）或 `ad-hoc`（装指定 UDID 的设备）。
+然后把 `mode` 选成 `development`（装自己或团队已注册设备）、`ad-hoc`（装指定 UDID 的设备），或者 `enterprise`（企业证书 In-House，不绑设备）。
 
 **这里最容易踩的坑**：`bundle_id` 必须和描述文件里的 App ID 完全一致，否则报 `Provisioning profile doesn't match the bundle identifier`。
 
@@ -125,6 +125,9 @@ cd build && zip -qry ScanDoc-unsigned.ipa Payload
 |---|---|---|
 | 免费 Apple ID（Personal Team） | 7 天 | 到期 App 打不开，重签续期；最多 3 个 App、不能推送 |
 | 付费个人/公司开发者（$99/年） | 1 年 | 可 TestFlight、可 Ad Hoc 分发到最多 100 台设备 |
+| 企业开发者（$299/年，In-House） | 1 年 | **不绑 UDID**，任意设备可装。但按协议只能发给本公司员工，对外分发被查会吊销 |
+
+**企业证书的边界**：`mode` 选 `enterprise` 后，导出的包可以直接装到任何设备上、不会掉签，也不用登记 UDID——这是它唯一的、也是很大的便利。但 Apple 对 In-House 证书的约束是「仅限组织内部员工使用」，一旦被判定为对外分发（比如公开下载链接、给客户装），证书会被吊销，**所有已经装了的人当场打不开，且没有任何离线补救手段**。自己用、给自己团队用没问题，别拿去当分发渠道。
 
 ## 常见问题
 

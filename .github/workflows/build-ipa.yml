@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "构建方式：unsigned 出未签名 ipa（全能签/AltStore 用）；其余三项用你自己的证书直接签好"
+        description: "构建方式：unsigned 未签名（全能签用）；development / ad-hoc 自有证书；enterprise 企业证书直装"
         required: true
         default: unsigned
         type: choice
@@ -15,6 +15,7 @@ on:
           - development
           - ad-hoc
           - app-store
+          - enterprise
       bundle_id:
         description: "Bundle ID（留空使用项目默认 com.scandoc.app）"
         required: false
@@ -135,6 +136,11 @@ jobs:
           security cms -D -i "$PROFILE_PATH" > "$RUNNER_TEMP/profile.plist"
           PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$RUNNER_TEMP/profile.plist")
           PROFILE_TEAM=$(/usr/libexec/PlistBuddy -c "Print :TeamIdentifier:0" "$RUNNER_TEMP/profile.plist")
+          PROFILE_ALL_DEVICES=$(/usr/libexec/PlistBuddy -c "Print :ProvisionsAllDevices" "$RUNNER_TEMP/profile.plist" 2>/dev/null || echo "false")
+
+          if [ "$MODE" = "enterprise" ] && [ "$PROFILE_ALL_DEVICES" != "true" ]; then
+            echo "::warning::这个描述文件不是 In-House（企业）类型，用 enterprise 导出大概率失败。请确认下载的是 In-House Distribution Profile。"
+          fi
 
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$(uuidgen).mobileprovision"
