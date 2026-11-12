@@ -1,6 +1,8 @@
 name: Build IPA
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       mode:
@@ -25,7 +27,7 @@ jobs:
     timeout-minutes: 40
 
     env:
-      MODE: ${{ inputs.mode }}
+      MODE: ${{ inputs.mode || 'unsigned' }}
       BUNDLE_ID_INPUT: ${{ inputs.bundle_id }}
       CERT_B64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
       PROFILE_B64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
