@@ -1,0 +1,8 @@
+# 统一用 LF，避免 Windows 检出时 CRLF 导致 CI 里的 bash 脚本执行失败
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ipa binary
+*.p12 binary
+*.mobileprovision binary
