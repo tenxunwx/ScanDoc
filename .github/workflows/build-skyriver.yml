@@ -1,0 +1,71 @@
+name: Build SkyRiver
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "SkyRiver/**"
+      - ".github/workflows/build-skyriver.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: 编译天河
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: SkyRiver
+
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 查看 Xcode 版本
+        run: xcodebuild -version
+
+      - name: 安装 XcodeGen
+        run: brew install xcodegen
+
+      - name: 生成 Xcode 工程
+        run: xcodegen generate
+
+      - name: 编译并打包未签名 ipa
+        run: |
+          set -euo pipefail
+
+          xcodebuild archive \
+            -project SkyRiver.xcodeproj \
+            -scheme SkyRiver \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/SkyRiver.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            -quiet
+
+          APP_PATH="$RUNNER_TEMP/SkyRiver.xcarchive/Products/Applications/SkyRiver.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "找不到编译产物：$APP_PATH"
+            find "$RUNNER_TEMP/SkyRiver.xcarchive" -maxdepth 4 -type d
+            exit 1
+          fi
+
+          rm -rf "$APP_PATH/_CodeSignature" "$APP_PATH/embedded.mobileprovision"
+
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          cp -R "$APP_PATH" "$RUNNER_TEMP/ipa/Payload/"
+
+          cd "$RUNNER_TEMP/ipa"
+          zip -qry "SkyRiver-unsigned.ipa" Payload
+          ls -lh "SkyRiver-unsigned.ipa"
+
+      - name: 上传未签名 ipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: SkyRiver-unsigned-ipa
+          path: ${{ runner.temp }}/ipa/SkyRiver-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
