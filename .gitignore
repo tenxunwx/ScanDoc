@@ -1,0 +1,11 @@
+# 忽略生成物与签名材料
+ScanDoc.xcodeproj/
+ScanDoc/Info.plist
+build/
+DerivedData/
+*.ipa
+*.p12
+*.mobileprovision
+*.cer
+.DS_Store
+.DS_Store?
