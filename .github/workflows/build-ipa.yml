@@ -23,7 +23,7 @@ on:
 jobs:
   build:
     name: 编译打包
-    runs-on: macos-14
+    runs-on: macos-latest
     timeout-minutes: 40
 
     env:
