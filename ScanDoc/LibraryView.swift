@@ -13,13 +13,22 @@ struct LibraryView: View {
     @State private var renameTarget: ScanDocument?
     @State private var renameText = ""
     @State private var deleteTarget: ScanDocument?
+    @State private var searchText = ""
 
     private let columns = [GridItem(.adaptive(minimum: 150, maximum: 220), spacing: 16)]
+
+    private var filteredDocuments: [ScanDocument] {
+        guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return store.documents
+        }
+        return store.documents.filter { $0.matches(searchText) }
+    }
 
     var body: some View {
         NavigationStack {
             content
                 .navigationTitle("扫描件")
+                .searchable(text: $searchText, prompt: "搜索标题或文内文字")
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
@@ -86,10 +95,14 @@ struct LibraryView: View {
     private var content: some View {
         if store.documents.isEmpty {
             emptyState
+        } else if filteredDocuments.isEmpty {
+            EmptyStateView(icon: "magnifyingglass",
+                           title: "没有找到",
+                           message: "换个关键词试试。搜索会同时匹配文档标题和识别出来的文字。")
         } else {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 20) {
-                    ForEach(store.documents) { document in
+                    ForEach(filteredDocuments) { document in
                         NavigationLink {
                             DocumentDetailView(documentID: document.id)
                         } label: {

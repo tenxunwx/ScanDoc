@@ -54,12 +54,12 @@ final class DocumentStore: ObservableObject {
 
     func processedImage(_ page: ScannedPage, mode: EnhanceMode? = nil) -> UIImage? {
         guard let raw = pageImage(page) else { return nil }
-        return ImageTools.render(raw, mode: mode ?? page.enhance)
+        return ImageTools.render(raw, mode: mode ?? page.enhance, rotation: page.rotation)
     }
 
     /// 同步缩略图（带缓存），用于列表与网格。
     func thumbnail(_ page: ScannedPage, maxSide: CGFloat = 480) -> UIImage? {
-        let key = "\(page.imageName)-\(page.enhance.rawValue)-\(Int(maxSide))" as NSString
+        let key = "\(page.imageName)-\(page.enhance.rawValue)-\(page.rotation)-\(Int(maxSide))" as NSString
         if let cached = thumbCache.object(forKey: key) { return cached }
         guard let image = processedImage(page) else { return nil }
         let thumb = ImageTools.thumbnail(image, maxSide: maxSide)
@@ -110,6 +110,94 @@ final class DocumentStore: ObservableObject {
         persist()
     }
 
+    func setOCR(_ result: OCRResult, documentID: UUID, pageID: UUID) {
+        guard let docIndex = documents.firstIndex(where: { $0.id == documentID }),
+              let pageIndex = documents[docIndex].pages.firstIndex(where: { $0.id == pageID }) else { return }
+        documents[docIndex].pages[pageIndex].ocrText = result.text
+        documents[docIndex].pages[pageIndex].ocrLines = result.lines
+        persist()
+    }
+
+    /// 顺时针旋转页面。同时把已有的 OCR 坐标一起旋转，免得用户还要重新识别。
+    func rotatePage(documentID: UUID, pageID: UUID, by degrees: Int) {
+        guard let docIndex = documents.firstIndex(where: { $0.id == documentID }),
+              let pageIndex = documents[docIndex].pages.firstIndex(where: { $0.id == pageID }) else { return }
+
+        let delta = ((degrees % 360) + 360) % 360
+        guard delta != 0 else { return }
+
+        var page = documents[docIndex].pages[pageIndex]
+        page.rotation = (page.rotation + delta) % 360
+        if let lines = page.ocrLines {
+            page.ocrLines = Self.rotateLines(lines, by: delta)
+        }
+        documents[docIndex].pages[pageIndex] = page
+        thumbCache.removeAllObjects()
+        persist()
+    }
+
+    /// 在文档内上下移动页面。
+    func movePage(documentID: UUID, pageID: UUID, offset: Int) {
+        guard let docIndex = documents.firstIndex(where: { $0.id == documentID }),
+              let index = documents[docIndex].pages.firstIndex(where: { $0.id == pageID }) else { return }
+        let target = index + offset
+        guard target >= 0, target < documents[docIndex].pages.count else { return }
+        let page = documents[docIndex].pages.remove(at: index)
+        documents[docIndex].pages.insert(page, at: target)
+        persist()
+    }
+
+    /// 依次识别文档内所有页面，返回（成功数, 失败数）。
+    func recognizeAllPages(documentID: UUID,
+                           progress: (@MainActor (Int, Int) -> Void)? = nil) async -> (done: Int, failed: Int) {
+        guard let doc = document(id: documentID) else { return (0, 0) }
+        let pages = doc.pages
+        var done = 0
+        var failed = 0
+
+        for (index, page) in pages.enumerated() {
+            if let image = processedImage(page),
+               let result = try? await OCRService.recognize(image) {
+                setOCR(result, documentID: documentID, pageID: page.id)
+                done += 1
+            } else {
+                failed += 1
+            }
+            await progress?(index + 1, pages.count)
+        }
+        return (done, failed)
+    }
+
+    private static func rotateLines(_ lines: [OCRLine], by degrees: Int) -> [OCRLine] {
+        let angle = ((degrees % 360) + 360) % 360
+        guard angle != 0 else { return lines }
+
+        return lines.map { line in
+            switch angle {
+            case 90:
+                return OCRLine(text: line.text,
+                               x: 1 - line.y - line.height,
+                               y: line.x,
+                               width: line.height,
+                               height: line.width)
+            case 180:
+                return OCRLine(text: line.text,
+                               x: 1 - line.x - line.width,
+                               y: 1 - line.y - line.height,
+                               width: line.width,
+                               height: line.height)
+            case 270:
+                return OCRLine(text: line.text,
+                               x: line.y,
+                               y: 1 - line.x - line.width,
+                               width: line.height,
+                               height: line.width)
+            default:
+                return line
+            }
+        }
+    }
+
     func deletePage(documentID: UUID, pageID: UUID) {
         guard let docIndex = documents.firstIndex(where: { $0.id == documentID }),
               let pageIndex = documents[docIndex].pages.firstIndex(where: { $0.id == pageID }) else { return }
@@ -133,14 +221,17 @@ final class DocumentStore: ObservableObject {
 
     // MARK: - 导出
 
-    func exportPDF(documentID: UUID) throws -> URL {
+    func exportPDF(documentID: UUID, options: ExportOptions = ExportOptions()) throws -> URL {
         guard let doc = document(id: documentID) else {
             throw ExportError.documentMissing
         }
-        let images = doc.pages.compactMap { processedImage($0) }
-        guard !images.isEmpty else { throw ExportError.emptyDocument }
+        let pages: [PDFBuilder.Page] = doc.pages.compactMap { page in
+            guard let image = processedImage(page) else { return nil }
+            return PDFBuilder.Page(image: image, lines: page.ocrLines ?? [])
+        }
+        guard !pages.isEmpty else { throw ExportError.emptyDocument }
 
-        let data = PDFBuilder.makePDF(pages: images, title: doc.title)
+        let data = PDFBuilder.makePDF(pages: pages, title: doc.title, options: options)
         let safeName = doc.title.replacingOccurrences(of: "/", with: "-")
         let url = fileManager.temporaryDirectory.appendingPathComponent("\(safeName).pdf")
         try data.write(to: url, options: .atomic)

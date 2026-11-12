@@ -25,6 +25,11 @@ struct PageDetailView: View {
         return index + 1
     }
 
+    /// 任一影响画面的因素变化，都会触发重新渲染。
+    private var renderKey: String {
+        "\(mode.rawValue)-\(page?.rotation ?? 0)-\(page?.imageName ?? "")"
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
@@ -38,6 +43,13 @@ struct PageDetailView: View {
         .navigationTitle("第 \(pageNumber) 页")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    rotate()
+                } label: {
+                    Image(systemName: "rotate.right")
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     sharePageImage()
@@ -59,7 +71,7 @@ struct PageDetailView: View {
             guard didLoad else { return }
             store.setEnhanceMode(newValue, documentID: documentID, pageID: pageID)
         }
-        .task(id: mode) {
+        .task(id: renderKey) {
             await renderCurrent()
         }
     }
@@ -113,7 +125,7 @@ struct PageDetailView: View {
             }
 
             if ocrText.isEmpty {
-                Text("识别后可以把这一页的文字复制出来，用于检索或粘贴到别处。全程离线，不上传任何内容。")
+                Text("识别后可以把这一页的文字复制出来，导出的 PDF 也会变成可搜索的。全程离线，不上传任何内容。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } else {
@@ -122,7 +134,7 @@ struct PageDetailView: View {
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(12)
-                    .background(Color(uiColor: .secondarySystemGroupedBackground),
+                    .background(Color(uiColor: .tertiarySystemGroupedBackground),
                                 in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                 Button {
@@ -160,10 +172,15 @@ struct PageDetailView: View {
             return
         }
         let target = mode
+        let angle = page.rotation
         let output = await Task.detached(priority: .userInitiated) { () -> UIImage? in
-            ImageTools.render(raw, mode: target)
+            ImageTools.render(raw, mode: target, rotation: angle)
         }.value
         rendered = output
+    }
+
+    private func rotate() {
+        store.rotatePage(documentID: documentID, pageID: pageID, by: 90)
     }
 
     private func recognize() {
@@ -171,9 +188,9 @@ struct PageDetailView: View {
         isRecognizing = true
         Task { @MainActor in
             do {
-                let text = try await OCRService.recognize(image)
-                ocrText = text
-                store.setOCRText(text, documentID: documentID, pageID: pageID)
+                let result = try await OCRService.recognize(image)
+                ocrText = result.text
+                store.setOCR(result, documentID: documentID, pageID: pageID)
             } catch {
                 errorMessage = error.localizedDescription
             }
