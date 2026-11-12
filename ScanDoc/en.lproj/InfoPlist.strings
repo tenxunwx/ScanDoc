@@ -1,0 +1,3 @@
+"CFBundleDisplayName" = "ScanDoc";
+"CFBundleName" = "ScanDoc";
+"NSCameraUsageDescription" = "Camera is used to scan paper documents. Images are stored on this device only.";

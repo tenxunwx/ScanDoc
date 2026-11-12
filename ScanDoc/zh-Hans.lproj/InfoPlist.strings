@@ -1,0 +1,3 @@
+"CFBundleDisplayName" = "扫描";
+"CFBundleName" = "扫描";
+"NSCameraUsageDescription" = "需要使用相机拍摄纸质文档，图像仅保存在本机。";
