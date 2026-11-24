@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>安装 扫描</title>
+<style>
+  :root {
+    --ink: #1d1d1f;
+    --muted: #6e6e73;
+    --line: #e6e6ea;
+    --card: #ffffff;
+    --bg: #f5f5f7;
+    --accent: #0a7c66;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
+    padding: 24px;
+  }
+  .card {
+    width: 100%;
+    max-width: 380px;
+    background: var(--card);
+    border-radius: 20px;
+    padding: 32px 26px 26px;
+    text-align: center;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.06);
+  }
+  .icon {
+    width: 88px;
+    height: 88px;
+    border-radius: 20px;
+    margin: 0 auto 18px;
+    background: #0a0f14;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .icon img { width: 100%; height: 100%; object-fit: cover; }
+  .icon span { color: #d8b56e; font-size: 34px; font-weight: 600; }
+  h1 { font-size: 21px; font-weight: 600; margin: 0 0 6px; }
+  .meta { font-size: 13px; color: var(--muted); margin: 0 0 24px; }
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 15px;
+    border: 0;
+    border-radius: 13px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .btn:active { opacity: 0.82; }
+  .btn[disabled] { background: #c9c9cf; cursor: default; }
+  .note {
+    margin: 20px 0 0;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--muted);
+    text-align: left;
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+  }
+  .note b { color: var(--ink); font-weight: 600; }
+  .warn {
+    margin-top: 14px;
+    background: #fff8e6;
+    border: 1px solid #f2dfa8;
+    color: #7a5a12;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 12.5px;
+    line-height: 1.6;
+    text-align: left;
+    display: none;
+  }
+  .steps {
+    counter-reset: step;
+    padding: 0;
+    margin: 14px 0 0;
+    list-style: none;
+    text-align: left;
+  }
+  .steps li {
+    position: relative;
+    padding-left: 26px;
+    margin-bottom: 9px;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+  .steps li::before {
+    counter-increment: step;
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 1px;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    background: #ececf1;
+    color: #55555c;
+    font-size: 10.5px;
+    line-height: 17px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon" id="icon"><span>签</span></div>
+    <h1 id="appName">扫描</h1>
+    <p class="meta" id="appMeta">版本 1.0 · 未签名调试版</p>
+
+    <button class="btn" id="installBtn" onclick="startInstall()">安装</button>
+
+    <div class="warn" id="warn"></div>
+
+    <p class="note">
+      <b>装完打不开？</b>首次运行会提示「未受信任的开发者」。
+      去 <b>设置 → 通用 → VPN 与设备管理</b>，找到对应企业名称，点「信任」。
+    </p>
+
+    <ol class="steps">
+      <li>请用 iPhone 或 iPad 的 <b>Safari</b> 打开本页（微信内置浏览器不行）</li>
+      <li>点「安装」，系统会提示下载描述文件，允许</li>
+      <li>回到桌面等待图标出现</li>
+    </ol>
+  </div>
+
+<script>
+  const CONFIG = {
+    appName: "扫描",
+    version: "1.0",
+    build: "3",
+    manifestUrl: "https://你的域名/install/manifest.plist",
+    iconUrl: "icon.png"
+  };
+
+  const nameEl = document.getElementById("appName");
+  const metaEl = document.getElementById("appMeta");
+  const warnEl = document.getElementById("warn");
+  const btn = document.getElementById("installBtn");
+
+  nameEl.textContent = CONFIG.appName;
+  metaEl.textContent = "版本 " + CONFIG.version + " (" + CONFIG.build + ")";
+
+  if (CONFIG.iconUrl) {
+    const img = new Image();
+    img.onload = function () { document.getElementById("icon").innerHTML = ""; document.getElementById("icon").appendChild(img); };
+    img.src = CONFIG.iconUrl;
+  }
+
+  const ua = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isSafari = isIOS && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|MicroMessenger|QQ\//.test(ua);
+
+  if (!isIOS) {
+    btn.disabled = true;
+    btn.textContent = "请在 iPhone / iPad 上打开";
+    warnEl.style.display = "block";
+    warnEl.textContent = "这个页面只能在 iOS 设备上安装 App。用手机或 iPad 的 Safari 访问当前地址即可。";
+  } else if (!isSafari) {
+    warnEl.style.display = "block";
+    warnEl.textContent = "检测到你可能在使用微信或第三方浏览器。请点右上角「···」，选择「在 Safari 中打开」，否则无法安装。";
+  }
+
+  function startInstall() {
+    if (!CONFIG.manifestUrl || CONFIG.manifestUrl.indexOf("你的域名") >= 0) {
+      warnEl.style.display = "block";
+      warnEl.textContent = "还没配置安装地址：请先修改页面里的 CONFIG.manifestUrl。";
+      return;
+    }
+    const url = "itms-services://?action=download-manifest&url=" + encodeURIComponent(CONFIG.manifestUrl);
+    window.location.href = url;
+  }
+</script>
+</body>
+</html>

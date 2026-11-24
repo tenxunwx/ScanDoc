@@ -3,6 +3,10 @@ name: Build IPA
 on:
   push:
     branches: [main]
+    paths:
+      - "ScanDoc/**"
+      - "project.yml"
+      - ".github/workflows/build-ipa.yml"
   workflow_dispatch:
     inputs:
       mode:
